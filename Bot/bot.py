@@ -1,0 +1,520 @@
+import os
+import asyncio
+import random
+import re
+import json
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import Command
+from telethon import TelegramClient, errors
+
+# ====== НАСТРОЙКИ ======
+BOT_TOKEN = "8338382231:AAH4Cx3ruhXbiyGWv1z2USQtOVb2-21XZnY"
+API_ID = 26921799
+API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
+ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
+
+SESSION_FOLDER = "sessions"
+os.makedirs(SESSION_FOLDER, exist_ok=True)
+
+PERMISSIONS_FILE = "permissions.json"
+if os.path.exists(PERMISSIONS_FILE):
+    with open(PERMISSIONS_FILE, "r", encoding="utf-8") as f:
+        permissions = json.load(f)
+else:
+    permissions = {}
+
+# Хранилище клиентов и кодов
+clients = {}
+pending_auth = {}
+last_codes = {}
+code_requests = {}  # {session_name: [user_ids]}
+
+# ====== TELEGRAM BOT ======
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+# === Меню (только список аккаунтов) ===
+menu_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📂 Список аккаунтов")],
+    ],
+    resize_keyboard=True
+)
+
+# ====== ФУНКЦИИ СЕССИЙ ======
+async def load_sessions():
+    files = [f for f in os.listdir(SESSION_FOLDER) if f.endswith(".session")]
+    for file in files:
+        name = os.path.splitext(file)[0]
+        path = os.path.join(SESSION_FOLDER, name)
+
+        # 🔹 Прокси для России
+        proxy = ('socks5', 'pool.proxy.market', 10000, True, 'KJ3MBrbSovIk', '76nHTRzC')
+
+        client = TelegramClient(
+            path, API_ID, API_HASH,
+            proxy=proxy,
+            device_model=f"Device_{name}",
+            system_version=f"Android {random.randint(6, 13)}",
+            app_version=f"{random.randint(7, 9)}.{random.randint(1, 9)}.{random.randint(1, 9)}",
+            lang_code="ru"
+        )
+
+        await client.connect()
+        if await client.is_user_authorized():
+            clients[name] = client
+            await client.start()
+        else:
+            await client.disconnect()
+
+async def add_account(phone: str, user_id: int):
+    name = phone.replace("+", "")
+    path = os.path.join(SESSION_FOLDER, name)
+
+    # 🔹 Российский SOCKS5 прокси
+    proxy = ('socks5', 'pool.proxy.market', 10000, True, 'KJ3MBrbSovIk', '76nHTRzC')
+
+    client = TelegramClient(
+        path,
+        API_ID,
+        API_HASH,
+        proxy=proxy,
+        device_model=f"Device_{name}",
+        system_version=f"Android {random.randint(6, 13)}",
+        app_version=f"{random.randint(7, 9)}.{random.randint(1, 9)}",
+        lang_code="ru",
+        system_lang_code="ru",
+        use_ipv6=False
+    )
+
+    await client.connect()
+    try:
+        await client.send_code_request(phone)
+        pending_auth[name] = {"client": client, "phone": phone, "user_id": user_id}
+        return f"✅ Код отправлен на {phone}. Введи его командой: /code {name} 12345"
+    except Exception as e:
+        print(f"[DEBUG] Ошибка при отправке кода на {phone}: {e}")
+        return f"⚠️ Ошибка: {e}"
+async def confirm_code(name: str, code: str):
+    if name not in pending_auth:
+        return "⚠️ Нет ожидающей авторизации для этого аккаунта"
+    client = pending_auth[name]["client"]
+    try:
+        await client.sign_in(code=code)
+        if await client.is_user_authorized():
+            clients[name] = client
+            pending_auth.pop(name)
+            await client.start()
+            return f"✅ Аккаунт {name} успешно авторизован"
+        else:
+            return "❌ Авторизация не удалась"
+    except errors.SessionPasswordNeededError:
+        return "⚠️ У аккаунта включена 2FA. Используй /password"
+    except Exception as e:
+        return f"❌ Ошибка: {e}"
+
+async def get_last_code(name: str):
+    if name not in clients:
+        return "⚠️ Аккаунт не найден"
+    client = clients[name]
+    try:
+        messages = await client.get_messages(777000, limit=5)
+        for msg in messages:
+            match = re.search(r"\d{5}", msg.message)
+            if match:
+                code = match.group(0)
+                last_codes[name] = code
+                return f"{code}"
+        return f"❌ Код для {name} не найден"
+    except Exception as e:
+        return f"⚠️ Ошибка при получении кода: {e}"
+
+# ====== СИСТЕМА ДОСТУПОВ ======
+def save_permissions():
+    with open(PERMISSIONS_FILE, "w", encoding="utf-8") as f:
+        json.dump(permissions, f, ensure_ascii=False, indent=2)
+
+def check_access(user_id, session_name=None):
+    if user_id == ADMIN_ID:
+        return True
+    if str(user_id) in permissions:
+        if session_name:
+            return session_name in permissions[str(user_id)]
+        return True
+    return False
+
+# ====== КОМАНДЫ ======
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    help_text = (
+        "📖 Доступные команды:\n\n"
+        "/help – показать это меню\n"
+        "/add <номер> – добавить аккаунт (только админ)\n"
+        "/delete <имя_сессии> – удалить аккаунт (только админ)\n"
+        "/code <имя_сессии> <код> – подтвердить код входа (только админ)\n"
+        "/grant <user_id> <имя_сессии> – выдать доступ пользователю (только админ)\n"
+    )
+    await message.answer(help_text)
+
+@dp.message(Command("add"))
+async def add_account_cmd(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может добавлять аккаунты")
+        return
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.answer("❌ Используй формат: /add +79998887766")
+        return
+    phone = parts[1].strip()
+    result = await add_account(phone, message.from_user.id)
+    await message.answer(result, reply_markup=menu_kb)
+
+@dp.message(Command("delete"))
+async def delete_account_cmd(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может удалять аккаунты")
+        return
+
+    parts = message.text.split()
+    if len(parts) != 2:
+        await message.answer("❌ Используй формат: /delete <имя_сессии>\n"
+                             f"Доступные: {', '.join(clients.keys()) if clients else 'нет'}")
+        return
+
+    name = parts[1]
+    if name not in clients:
+        await message.answer(f"⚠️ Аккаунт {name} не найден")
+        return
+
+    # Отключаем и удаляем сессию
+    client = clients.pop(name)
+    await client.disconnect()
+    session_path = os.path.join(SESSION_FOLDER, f"{name}.session")
+    if os.path.exists(session_path):
+        os.remove(session_path)
+    last_codes.pop(name, None)
+
+    # ⚙️ Удаляем аккаунт из permissions
+    removed_from = []
+    for user_id in list(permissions.keys()):
+        if name in permissions[user_id]:
+            permissions[user_id].remove(name)
+            if not permissions[user_id]:  # если у пользователя больше нет доступов — удаляем полностью
+                del permissions[user_id]
+            removed_from.append(user_id)
+
+    save_permissions()
+
+    # Сообщение админу
+    text = f"🗑 Аккаунт <b>{name}</b> удалён."
+    if removed_from:
+        text += f"\n❎ Удалён из доступа у пользователей: {', '.join(removed_from)}"
+    await message.answer(text, parse_mode="HTML", reply_markup=menu_kb)
+
+@dp.callback_query(lambda c: c.data.startswith("getcode:"))
+async def callback_get_code(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    session_name = callback.data.split(":", 1)[1]
+
+    if not check_access(user_id, session_name):
+        await callback.message.answer("⛔ У тебя нет доступа к этому аккаунту")
+        await callback.answer()
+        return
+
+    # ⚡ Уведомление админу
+    if user_id != ADMIN_ID:
+        await bot.send_message(
+            ADMIN_ID,
+            f"🔔 Пользователь @{callback.from_user.username or callback.from_user.id} "
+            f"(ID: {user_id}) запросил код для аккаунта <b>{session_name}</b>",
+            parse_mode="HTML"
+        )
+
+        # 🧩 Логируем запрос
+        if session_name not in code_requests:
+            code_requests[session_name] = []
+        if user_id not in code_requests[session_name]:
+            code_requests[session_name].append(user_id)
+
+    result = await get_last_code(session_name)
+    await callback.message.answer(result)
+    await callback.answer()
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "👋 Привет! Я бот для управления Telegram аккаунтами.\nВыбери действие:",
+        reply_markup=menu_kb
+    )
+
+@dp.message(lambda m: m.text == "📂 Список аккаунтов")
+async def list_accounts(message: types.Message):
+    user_id = message.from_user.id
+
+    # Определяем, какие аккаунты показывать пользователю
+    if user_id == ADMIN_ID:
+        available = list(clients.keys())
+    elif str(user_id) in permissions:
+        available = permissions[str(user_id)]
+    else:
+        available = []
+
+    if not available:
+        await message.answer("⚠️ Нет доступных аккаунтов", reply_markup=menu_kb)
+        return
+
+    for name in available:
+        info_text = ""
+
+        if user_id == ADMIN_ID:
+            # 🧾 Список пользователей, у которых есть доступ
+            granted_users = [uid for uid, accs in permissions.items() if name in accs]
+            if granted_users:
+                info_text += "👥 Доступ:\n"
+                for uid in granted_users:
+                    info_text += f"• {uid}"
+                    # Если пользователь запрашивал код — добавить пометку
+                    if name in code_requests and uid in code_requests[name]:
+                        info_text += " (запрашивал код)"
+                    info_text += "\n"
+            else:
+                info_text += "🚫 Нет выданных доступов\n"
+
+        # Кнопки для каждого аккаунта
+        kb_buttons = [[InlineKeyboardButton(text="📩 Получить код", callback_data=f"getcode:{name}")]]
+        if user_id == ADMIN_ID:
+            kb_buttons.append([
+                InlineKeyboardButton(text="📝 Переименовать", callback_data=f"rename:{name}"),
+                InlineKeyboardButton(text="👥 Доступ", callback_data=f"grant:{name}")
+            ])
+            kb_buttons.append([
+                InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
+            ])
+
+        kb = InlineKeyboardMarkup(inline_keyboard=kb_buttons)
+        await message.answer(f"🔹 <b>{name}</b>\n{info_text}", parse_mode="HTML", reply_markup=kb)
+
+
+# === ИЗМЕНЕНИЕ НАЗВАНИЯ ===
+@dp.callback_query(lambda c: c.data.startswith("rename:"))
+async def callback_rename(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Только админ может переименовывать аккаунты")
+        return
+
+    old_name = callback.data.split(":", 1)[1]
+    await callback.message.answer(f"📝 Введи новое имя для <b>{old_name}</b>:", parse_mode="HTML")
+
+    @dp.message()
+    async def rename_waiter(message: types.Message):
+        new_name = message.text.strip()
+        old_path = os.path.join(SESSION_FOLDER, f"{old_name}.session")
+        new_path = os.path.join(SESSION_FOLDER, f"{new_name}.session")
+
+        if not os.path.exists(old_path):
+            await message.answer("⚠️ Файл сессии не найден.")
+            return
+        if os.path.exists(new_path):
+            await message.answer("⚠️ Такое имя уже занято.")
+            return
+
+        client = clients.get(old_name)
+        if client:
+            try:
+                await client.disconnect()  # 🔹 Отключаем, чтобы освободить файл
+            except Exception:
+                pass
+
+        try:
+            os.rename(old_path, new_path)
+        except Exception as e:
+            await message.answer(f"❌ Ошибка при переименовании: {e}")
+            return
+
+        # 🔹 Создаём новый Telethon клиент
+        new_client = TelegramClient(
+            os.path.join(SESSION_FOLDER, new_name),
+            API_ID,
+            API_HASH,
+            device_model=f"Device_{new_name}",
+            system_version=f"Android {random.randint(6, 13)}",
+            app_version=f"{random.randint(7, 9)}.{random.randint(1, 9)}.{random.randint(1, 9)}",
+            lang_code="ru"
+        )
+        await new_client.connect()
+        if await new_client.is_user_authorized():
+            clients[new_name] = new_client
+        else:
+            await new_client.disconnect()
+
+        # 🔹 Обновляем словари
+        clients.pop(old_name, None)
+        if old_name in last_codes:
+            last_codes[new_name] = last_codes.pop(old_name)
+
+        # 🔹 Обновляем permissions
+        for uid in permissions:
+            if old_name in permissions[uid]:
+                permissions[uid].remove(old_name)
+                permissions[uid].append(new_name)
+        save_permissions()
+
+        await message.answer(
+            f"✅ Аккаунт <b>{old_name}</b> переименован в <b>{new_name}</b>",
+            parse_mode="HTML"
+        )
+        dp.message.handlers.pop()  # убираем временный обработчик
+
+
+# === ВЫДАТЬ ДОСТУП ===
+@dp.callback_query(lambda c: c.data.startswith("grant:"))
+async def callback_grant(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Только админ может выдавать доступ")
+        return
+
+    session_name = callback.data.split(":", 1)[1]
+    await callback.message.answer(
+        f"👥 Введи ID пользователя, которому выдать доступ к <b>{session_name}</b>:",
+        parse_mode="HTML"
+    )
+
+    # ⬇️ временный обработчик ввода ID
+    @dp.message()
+    async def grant_waiter(msg: types.Message):
+        target_id = msg.text.strip()
+        if not target_id.isdigit():
+            await msg.answer("❌ Неверный формат ID")
+            return
+
+        if target_id not in permissions:
+            permissions[target_id] = []
+        if session_name not in permissions[target_id]:
+            permissions[target_id].append(session_name)
+            save_permissions()
+            await msg.answer(f"✅ Пользователю {target_id} выдан доступ к <b>{session_name}</b>", parse_mode="HTML")
+        else:
+            await msg.answer(f"⚠️ У пользователя {target_id} уже есть доступ", parse_mode="HTML")
+
+        # Убираем временный обработчик, чтобы не перехватывать все следующие сообщения
+        dp.message.handlers.pop()
+
+# === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
+@dp.callback_query(lambda c: c.data.startswith("delete:"))
+async def callback_delete_session(callback: types.CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Только админ может удалять сессии")
+        return
+
+    name = callback.data.split(":", 1)[1]
+    if name not in clients:
+        await callback.message.answer(f"⚠️ Аккаунт {name} не найден")
+        await callback.answer()
+        return
+
+    # Отключаем и удаляем клиента
+    client = clients.pop(name)
+    try:
+        await client.disconnect()
+    except Exception:
+        pass
+
+    # Удаляем .session файл
+    session_path = os.path.join(SESSION_FOLDER, f"{name}.session")
+    if os.path.exists(session_path):
+        os.remove(session_path)
+    last_codes.pop(name, None)
+
+    # Удаляем из permissions
+    removed_from = []
+    for user_id in list(permissions.keys()):
+        if name in permissions[user_id]:
+            permissions[user_id].remove(name)
+            if not permissions[user_id]:
+                del permissions[user_id]
+            removed_from.append(user_id)
+    save_permissions()
+
+    # Уведомляем
+    text = f"🗑 Аккаунт <b>{name}</b> удалён."
+    if removed_from:
+        text += f"\n❎ Доступ удалён у пользователей: {', '.join(removed_from)}"
+
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=menu_kb)
+    await callback.answer("✅ Удалено")
+
+
+@dp.message(Command("code"))
+async def enter_code(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может вводить коды")
+        return
+    parts = message.text.split()
+    if len(parts) != 3:
+        await message.answer("❌ Используй формат: /code <имя_сессии> <код>")
+        return
+    name, code = parts[1], parts[2]
+    result = await confirm_code(name, code)
+    await message.answer(result, reply_markup=menu_kb)
+
+@dp.message(Command("password"))
+async def enter_password(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может вводить пароль 2FA")
+        return
+
+    parts = message.text.split(maxsplit=2)
+    if len(parts) != 3:
+        await message.answer("❌ Используй формат: /password <имя_сессии> <пароль>")
+        return
+
+    name, password = parts[1], parts[2]
+
+    if name not in pending_auth:
+        await message.answer("⚠️ Нет ожидающей авторизации для этого аккаунта")
+        return
+
+    client = pending_auth[name]["client"]
+
+    try:
+        await client.sign_in(password=password)
+        if await client.is_user_authorized():
+            clients[name] = client
+            pending_auth.pop(name)
+            await client.start()
+            await message.answer(f"✅ Аккаунт {name} успешно авторизован с 2FA", reply_markup=menu_kb)
+        else:
+            await message.answer("❌ Авторизация не удалась")
+    except Exception as e:
+        await message.answer(f"⚠️ Ошибка при вводе пароля: {e}")
+
+
+@dp.message(Command("grant"))
+async def grant_access(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может выдавать доступ")
+        return
+    parts = message.text.split()
+    if len(parts) != 3:
+        await message.answer("❌ Используй формат: /grant <user_id> <имя_сессии>")
+        return
+    user_id, session_name = parts[1], parts[2]
+    if session_name not in clients:
+        await message.answer("⚠️ Такого аккаунта нет")
+        return
+    if user_id not in permissions:
+        permissions[user_id] = []
+    if session_name not in permissions[user_id]:
+        permissions[user_id].append(session_name)
+    save_permissions()
+    await message.answer(f"✅ Пользователю {user_id} выдан доступ к {session_name}")
+
+# ====== ЗАПУСК ======
+async def main():
+    await load_sessions()
+    print("✅ Бот запущен")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
