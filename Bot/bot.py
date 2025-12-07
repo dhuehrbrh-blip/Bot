@@ -149,6 +149,7 @@ def check_access(user_id, session_name=None):
 async def cmd_help(message: types.Message):
     help_text = (
         "📖 Доступные команды:\n\n"
+        "/clear_permissions"
         "/help – показать это меню\n"
         "/add <номер> – добавить аккаунт (только админ)\n"
         "/delete <имя_сессии> – удалить аккаунт (только админ)\n"
@@ -400,6 +401,18 @@ async def callback_grant(callback: types.CallbackQuery):
         # Убираем временный обработчик, чтобы не перехватывать все следующие сообщения
         dp.message.handlers.pop()
 
+@dp.message(Command("clear_permissions"))
+async def clear_permissions_cmd(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может использовать эту команду")
+        return
+
+    permissions.clear()  # очищаем все доступы
+    save_permissions()   # сохраняем пустой файл
+
+    await message.answer("🧹 Все пользовательские доступы удалены и permissions.json очищен")
+
+
 # === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
 @dp.callback_query(lambda c: c.data.startswith("delete:"))
 async def callback_delete_session(callback: types.CallbackQuery):
@@ -518,3 +531,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
