@@ -50,7 +50,7 @@ async def load_sessions():
         path = os.path.join(SESSION_FOLDER, name)
 
         # 🔹 Прокси для России
-        proxy = ('socks5', 'pool.proxy.market', 10000, True, 'KJ3MBrbSovIk', '76nHTRzC')
+        proxy = ('socks5', 'mobpool.proxy.market', 10000, True, 'pa2Xb6bjENW9', 'DE3fkrVU')
 
         client = TelegramClient(
             path, API_ID, API_HASH,
@@ -531,4 +531,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
