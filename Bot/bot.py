@@ -73,7 +73,7 @@ async def add_account(phone: str, user_id: int):
     path = os.path.join(SESSION_FOLDER, name)
 
     # 🔹 Российский SOCKS5 прокси
-    proxy = ('socks5', 'pool.proxy.market', 10000, True, 'KJ3MBrbSovIk', '76nHTRzC')
+    proxy = ('socks5', 'mobpool.proxy.market', 10000, True, 'pa2Xb6bjENW9', 'DE3fkrVU')
 
     client = TelegramClient(
         path,
@@ -531,5 +531,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
