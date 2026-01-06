@@ -4,6 +4,8 @@ import re
 import os
 import json
 import sqlite3
+from aiogram import Bot, Dispatcher
+from aiohttp import TCPConnector
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
 from telethon import events
@@ -772,4 +774,5 @@ async def main():
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())
