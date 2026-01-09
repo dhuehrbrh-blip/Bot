@@ -5,8 +5,6 @@ import os
 import json
 import sqlite3
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.client.session.aiohttp import AiohttpSession
-from aiohttp import ClientTimeout, TCPConnector
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
 from telethon import events
@@ -27,15 +25,7 @@ API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
 ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
 
 
-# ===== AIORGRAM (бот) =====
-PROXY_URL = "socks5://cl7QIOAwFCVf:9B1XSpCT@pool.proxy.market:10020"
-
 # ====== Сессия бота ======
-session = AiohttpSession(
-    proxy=PROXY_URL,
-    timeout=60  # вместо ClientTimeout
-)
-
 bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -837,3 +827,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
