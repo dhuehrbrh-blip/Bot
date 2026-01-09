@@ -26,7 +26,7 @@ ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
 
 
 # ====== Сессия бота ======
-bot = Bot(token=BOT_TOKEN, session=session)
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 
@@ -827,4 +827,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
