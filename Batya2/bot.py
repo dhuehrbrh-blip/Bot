@@ -283,21 +283,7 @@ async def confirm_code(name: str, code: str):
     except Exception as e:
         return f"❌ Ошибка: {e}"
 
-async def get_last_code(name: str):
-    if name not in clients:
-        return "⚠️ Аккаунт не найден"
-    client = clients[name]
-    try:
-        messages = await client.get_messages(777000, limit=5)
-        for msg in messages:
-            match = re.search(r"\d{5}", msg.message)
-            if match:
-                code = match.group(0)
-                last_codes[name] = code
-                return f"{code}"
-        return f"❌ Код для {name} не найден"
-    except Exception as e:
-        return f"⚠️ Ошибка при получении кода: {e}"
+
 
 
 # ====== СИСТЕМА ДОСТУПОВ ======
@@ -524,7 +510,7 @@ async def clear_permissions_cmd(message: types.Message):
 # === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
 @dp.callback_query(lambda c: c.data.startswith("delete:"))
 async def callback_delete_session(callback: types.CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
+    if not is_admin(callback.from_user.id):
         await callback.answer("⛔ Только админ может удалять сессии")
         return
 
@@ -688,6 +674,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
