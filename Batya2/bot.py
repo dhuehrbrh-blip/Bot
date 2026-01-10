@@ -19,9 +19,9 @@ import phash_watcher
 from phash_watcher import HANDLER_COUNT
 # ====== НАСТРОЙКИ ======
 TARGET_CHAT_IDS = ["@leomatchbot"]
-BOT_TOKEN = "8338382231:AAH4Cx3ruhXbiyGWv1z2USQtOVb2-21XZnY"
-API_ID = 26921799
-API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
+BOT_TOKEN = "8370317657:AAFzRV0IP1uY_we_FUhbVhbv62EGrLs73oE"
+API_ID = 37610683
+API_HASH = "c93f23137fd651f517e17c182ef99465"
 ADMIN_IDS = {7676178737, 7459333401}  # <<<<< ТВОЙ TELEGRAM ID
 
 
@@ -694,6 +694,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
