@@ -471,11 +471,14 @@ async def cmd_start(message: types.Message):
 @dp.message(lambda m: m.text == "📂 Список аккаунтов")
 async def list_accounts(message: types.Message):
     global phash_state
+
+    # загружаем состояние phash
     try:
         with open(PHASH_STATE_FILE, "r", encoding="utf-8") as f:
             phash_state = json.load(f)
     except Exception:
         phash_state = {}
+
     user_id = message.from_user.id
     user_id_str = str(user_id)
 
@@ -494,11 +497,18 @@ async def list_accounts(message: types.Message):
     for name in available:
         info_text = ""
 
-        # ===== ВАЖНО: state_text объявляется ВСЕГДА =====
+        # ===== состояние базы =====
         state = phash_state.get(name, True)
         state_text = "🟢 База: ВКЛ" if state else "🔴 База: ВЫКЛ"
 
-        # инфо для админа
+        # ===== обработчики =====
+        handler_count = HANDLER_COUNT.get(name, 0)
+        info_text += f"🧠 Обработчиков: <b>{handler_count}</b>\n"
+
+        # ===== владелец (админ) =====
+        info_text += f"👤 Владелец: <a href='tg://user?id={ADMIN_ID}'>{ADMIN_ID}</a>\n"
+
+        # ===== инфо о доступах (только для админа) =====
         if user_id == ADMIN_ID:
             granted_users = [uid for uid, accs in permissions.items() if name in accs]
             if granted_users:
@@ -508,7 +518,7 @@ async def list_accounts(message: types.Message):
             else:
                 info_text += "🚫 Нет выданных доступов\n"
 
-        # кнопки
+        # ===== кнопки =====
         kb_buttons = [
             [
                 InlineKeyboardButton(
@@ -540,6 +550,7 @@ async def list_accounts(message: types.Message):
             parse_mode="HTML",
             reply_markup=kb
         )
+
 
 
 # === ИЗМЕНЕНИЕ НАЗВАНИЯ ===
@@ -844,6 +855,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
