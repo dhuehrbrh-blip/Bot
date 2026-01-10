@@ -530,15 +530,15 @@ async def list_accounts(message: types.Message):
                 )
             ]
         ]
-
+        kb_buttons.append([
+            InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
+        ])
         if user_id == ADMIN_ID:
             kb_buttons.append([
                 InlineKeyboardButton(text="📝 Переименовать", callback_data=f"rename:{name}"),
                 InlineKeyboardButton(text="👥 Доступ", callback_data=f"grant:{name}")
             ])
-            kb_buttons.append([
-                InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
-            ])
+
 
         kb = InlineKeyboardMarkup(inline_keyboard=kb_buttons)
 
@@ -852,6 +852,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
