@@ -17,7 +17,7 @@ VIDEO_DIR = "videos"
 PHASH_DISTANCE = 6
 TRIGGER_TEXT = "Кому-то понравилась твоя анкета"
 ATTACHED_ACCOUNTS = set()
-
+HANDLER_COUNT = {} 
 os.makedirs(PHOTO_DIR, exist_ok=True)
 os.makedirs(VIDEO_DIR, exist_ok=True)
 
@@ -87,8 +87,11 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
         print(f"[PHASH] handler already attached for {account_name}")
         return
 
+    
+    
     ATTACHED_ACCOUNTS.add(account_name)
-    print(f"[PHASH] handler attached for {account_name}")
+    HANDLER_COUNT[account_name] = HANDLER_COUNT.get(account_name, 0) + 1
+    print(f"[PHASH] handler attached for {account_name} (total: {HANDLER_COUNT[account_name]})")
 
     if isinstance(target_chat_ids, int):
         target_chat_ids = [target_chat_ids]
@@ -140,4 +143,5 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
                     await client.send_message(event.chat_id, "❤️")
             finally:
                 os.remove(file_path)
+
 
