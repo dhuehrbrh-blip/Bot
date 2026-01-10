@@ -16,7 +16,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from aiogram.filters import Command
 from telethon import TelegramClient, errors
 import phash_watcher
-
+from phash_watcher import HANDLER_COUNT
 # ====== НАСТРОЙКИ ======
 TARGET_CHAT_IDS = ["@leomatchbot"]
 BOT_TOKEN = "8338382231:AAH4Cx3ruhXbiyGWv1z2USQtOVb2-21XZnY"
@@ -855,6 +855,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
