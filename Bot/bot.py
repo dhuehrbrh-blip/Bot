@@ -361,14 +361,13 @@ def build_account_keyboard(user_id: int, account_name: str):
             )
         ]
     ]
-
+    kb_buttons.append([
+        InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{account_name}")
+    ])
     if user_id == ADMIN_ID:
         kb_buttons.append([
             InlineKeyboardButton(text="📝 Переименовать", callback_data=f"rename:{account_name}"),
             InlineKeyboardButton(text="👥 Доступ", callback_data=f"grant:{account_name}")
-        ])
-        kb_buttons.append([
-            InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{account_name}")
         ])
 
     return InlineKeyboardMarkup(inline_keyboard=kb_buttons)
@@ -853,6 +852,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
