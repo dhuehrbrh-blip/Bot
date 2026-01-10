@@ -16,35 +16,19 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from aiogram.filters import Command
 from telethon import TelegramClient, errors
 import phash_watcher
-
+from phash_watcher import HANDLER_COUNT
 # ====== НАСТРОЙКИ ======
 TARGET_CHAT_IDS = ["@leomatchbot"]
-BOT_TOKEN = "8370317657:AAFzRV0IP1uY_we_FUhbVhbv62EGrLs73oE"
-API_ID = 37610683
-API_HASH = "c93f23137fd651f517e17c182ef99465"
-ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
+BOT_TOKEN = "8338382231:AAH4Cx3ruhXbiyGWv1z2USQtOVb2-21XZnY"
+API_ID = 26921799
+API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
+ADMIN_IDS = {7676178737, 7459333401}  # <<<<< ТВОЙ TELEGRAM ID
 
-OPERATORS = {
-    7676178737,   # ты
-    5652700066,   # второй пользователь
-}
+
 # ====== Сессия бота ======
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-async def notify_admin(text: str):
-    try:
-        await bot.send_message(ADMIN_ID, text, parse_mode="HTML")
-    except Exception:
-        pass
-
-OPERATORS_FILE = "operators.json"
-
-if os.path.exists(OPERATORS_FILE):
-    with open(OPERATORS_FILE, "r", encoding="utf-8") as f:
-        OPERATORS = set(json.load(f))
-else:
-    OPERATORS = set()
 
 SESSION_FOLDER = "sessions"
 os.makedirs(SESSION_FOLDER, exist_ok=True)
@@ -83,77 +67,9 @@ menu_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-def save_operators():
-    with open(OPERATORS_FILE, "w", encoding="utf-8") as f:
-        json.dump(list(OPERATORS), f, indent=2)
-
-def save_operators():
-    with open(OPERATORS_FILE, "w", encoding="utf-8") as f:
-        json.dump(list(OPERATORS), f, indent=2)
-
-def is_operator(user_id: int) -> bool:
-    return user_id == ADMIN_ID or user_id in OPERATORS
-
-@dp.message(Command("operators"))
-async def operators_cmd(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ Только админ")
-        return
-
-    if not OPERATORS:
-        await message.answer("📭 Операторов нет")
-        return
-
-    text = "👥 <b>Операторы:</b>\n"
-    for uid in OPERATORS:
-        text += f"• {uid}\n"
-
-    await message.answer(text, parse_mode="HTML")
-
-@dp.message(Command("operators_add"))
-async def operators_add(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ Только админ")
-        return
-
-    parts = message.text.split()
-    if len(parts) != 2 or not parts[1].isdigit():
-        await message.answer("❌ Используй: /operators_add <user_id>")
-        return
-
-    uid = int(parts[1])
-    if uid in OPERATORS:
-        await message.answer("⚠️ Уже оператор")
-        return
-
-    OPERATORS.add(uid)
-    save_operators()
-    await message.answer(f"✅ Пользователь {uid} добавлен в операторы")
-
-@dp.message(Command("operators_remove"))
-async def operators_remove(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ Только админ")
-        return
-
-    parts = message.text.split()
-    if len(parts) != 2 or not parts[1].isdigit():
-        await message.answer("❌ Используй: /operators_remove <user_id>")
-        return
-
-    uid = int(parts[1])
-    if uid not in OPERATORS:
-        await message.answer("⚠️ Не является оператором")
-        return
-
-    OPERATORS.remove(uid)
-    save_operators()
-    await message.answer(f"🗑 Пользователь {uid} удалён из операторов")
-
-
 @dp.message(Command(commands=["db_size"]))
 async def db_size_cmd(message):
-    if not is_operator(message.from_user.id):
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может использовать эту команду")
         return
 
@@ -179,17 +95,20 @@ async def db_size_cmd(message):
 
     await message.answer(
         f"📦 Размер базы: {size_bytes} байт ({size_mb:.2f} MB)\n"
-        f"📝 Количество записей: {count}"
+        f"📝 Количество записей (фото + видео): {count}"
     )
 @dp.message(Command("import_db"))
 async def import_db(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может загружать базу")
         return
 
     await message.answer(
         "📥 Отправь файл базы SQLite (`.db`), я добавлю данные в текущую базу"
     )
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
 
 @dp.message(lambda m: m.document and m.from_user.id == ADMIN_ID)
 async def handle_db_upload(message: types.Message):
@@ -276,7 +195,7 @@ async def handle_db_upload(message: types.Message):
 
 @dp.message(Command("export_db"))
 async def export_db(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может выгружать базу")
         return
 
@@ -298,7 +217,7 @@ async def load_sessions():
         path = os.path.join(SESSION_FOLDER, name)
 
         # 🔹 Прокси для России
-        proxy = ('socks5', 'pool.proxy.market', 10014, True, '7abJSMc5umQJ', 'PoH5f3Xy')
+        proxy = ('socks5', 'pool.proxy.market', 10000, True, '7abJSMc5umQJ', 'PoH5f3Xy')
 
         client = TelegramClient(
             path, API_ID, API_HASH,
@@ -321,7 +240,7 @@ async def add_account(phone: str, user_id: int):
     path = os.path.join(SESSION_FOLDER, name)
 
     # 🔹 Российский SOCKS5 прокси
-    proxy = ('socks5', 'pool.proxy.market', 10014, True, '7abJSMc5umQJ', 'PoH5f3Xy')
+    proxy = ('socks5', 'pool.proxy.market', 10000, True, '7abJSMc5umQJ', 'PoH5f3Xy')
 
     client = TelegramClient(
         path,
@@ -387,7 +306,7 @@ def save_permissions():
         json.dump(permissions, f, ensure_ascii=False, indent=2)
 
 def check_access(user_id, session_name=None):
-    if user_id == ADMIN_ID:
+    if is_admin(user_id):
         return True
     if str(user_id) in permissions:
         if session_name:
@@ -400,9 +319,6 @@ def check_access(user_id, session_name=None):
 async def cmd_help(message: types.Message):
     help_text = (
         "📖 Доступные команды:\n"
-        "/operators\n"
-        "/operators_add\n"
-        "/operators_remove\n"
         "/clear_permissions\n"
         "/help – показать это меню\n"
         "/db_size – Размер базы\n"
@@ -417,8 +333,7 @@ async def cmd_help(message: types.Message):
 
 @dp.message(Command("add"))
 async def add_account_cmd(message: types.Message):
-    if not is_operator(message.from_user.id):
-
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может добавлять аккаунты")
         return
     parts = message.text.split()
@@ -427,28 +342,7 @@ async def add_account_cmd(message: types.Message):
         return
     phone = parts[1].strip()
     result = await add_account(phone, message.from_user.id)
-
-    # 🔐 если добавляет оператор — сразу выдаём доступ к аккаунту
-    if is_operator(message.from_user.id) and message.from_user.id != ADMIN_ID:
-        session_name = phone.replace("+", "")
-        uid = str(message.from_user.id)
-
-        if uid not in permissions:
-            permissions[uid] = []
-
-        if session_name not in permissions[uid]:
-            permissions[uid].append(session_name)
-            save_permissions()
-
-    if is_operator(message.from_user.id) and message.from_user.id != ADMIN_ID:
-        await notify_admin(
-            f"➕ <b>Оператор добавил аккаунт</b>\n"
-            f"👤 ID: {message.from_user.id}\n"
-            f"📞 Номер: {phone}"
-        )
-
     await message.answer(result, reply_markup=menu_kb)
-
 
 def build_account_keyboard(user_id: int, account_name: str):
     state = phash_state.get(account_name, True)
@@ -463,21 +357,20 @@ def build_account_keyboard(user_id: int, account_name: str):
         ]
     ]
 
-    if is_operator(user_id):
-        kb_buttons.append([
-            InlineKeyboardButton(
-                text="🗑 Удалить сессию",
-                callback_data=f"delete:{account_name}"
-            )
-        ])
+
+    kb_buttons.append([
+        InlineKeyboardButton(
+            text="🗑 Удалить сессию",
+            callback_data=f"delete:{account_name}"
+        )
+    ])
 
     return InlineKeyboardMarkup(inline_keyboard=kb_buttons)
 
 
 @dp.message(Command("delete"))
 async def delete_account_cmd(message: types.Message):
-    if not is_operator(message.from_user.id):
-
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может удалять аккаунты")
         return
 
@@ -537,27 +430,26 @@ async def toggle_phash(callback: types.CallbackQuery):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "👋 Привет!\n"
-        "/add <номер> – добавить аккаунт (только админ)\n"
-        "/delete <имя_сессии> – удалить аккаунт (только админ)\n"
-        "/code <имя_сессии> <код> – подтвердить код входа (только админ)\n"
-        "/db_size – Размер базы\n",
+        "👋 Привет! Я бот для управления Telegram аккаунтами.\nВыбери действие:",
         reply_markup=menu_kb
     )
 
 @dp.message(lambda m: m.text == "📂 Список аккаунтов")
 async def list_accounts(message: types.Message):
     global phash_state
+
+    # загружаем состояние phash
     try:
         with open(PHASH_STATE_FILE, "r", encoding="utf-8") as f:
             phash_state = json.load(f)
     except Exception:
         phash_state = {}
+
     user_id = message.from_user.id
     user_id_str = str(user_id)
 
     # какие аккаунты доступны
-    if user_id == ADMIN_ID:
+    if is_admin(user_id):
         available = list(clients.keys())
     elif user_id_str in permissions:
         available = [name for name in permissions[user_id_str] if name in clients]
@@ -571,11 +463,33 @@ async def list_accounts(message: types.Message):
     for name in available:
         info_text = ""
 
-        # ===== ВАЖНО: state_text объявляется ВСЕГДА =====
+        # ===== состояние базы =====
         state = phash_state.get(name, True)
         state_text = "🟢 База: ВКЛ" if state else "🔴 База: ВЫКЛ"
 
+        # ===== обработчики =====
+        handler_count = HANDLER_COUNT.get(name, 0)
+        info_text += f"🧠 Обработчиков: <b>{handler_count}</b>\n"
+
+
+        # ===== инфо о доступах (только для админа) =====
+        if is_admin(user_id):
+            granted_users = [uid for uid, accs in permissions.items() if name in accs]
+            if granted_users:
+                info_text += "👥 Доступ:\n"
+                for uid in granted_users:
+                    info_text += f"• <a href=\"https://t.me/user?id={uid}\">{uid}</a>\n"
+            else:
+                info_text += "🚫 Нет выданных доступов\n"
+
+        # ===== кнопки =====
         kb_buttons = [
+            [
+                InlineKeyboardButton(
+                    text="📩 Получить код",
+                    callback_data=f"getcode:{name}"
+                )
+            ],
             [
                 InlineKeyboardButton(
                     text=state_text,
@@ -583,20 +497,7 @@ async def list_accounts(message: types.Message):
                 )
             ]
         ]
-        # инфо для админа
-        if user_id == ADMIN_ID:
-            granted_users = [uid for uid, accs in permissions.items() if name in accs]
-            if granted_users:
-                info_text += "👥 Доступ:\n"
-                for uid in granted_users:
-                    info_text += f"• {uid}\n"
-            else:
-                info_text += "🚫 Нет выданных доступов\n"
-
-        # кнопки
-
-
-        if is_operator(user_id):
+        if is_admin(user_id):
             kb_buttons.append([
                 InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
             ])
@@ -612,9 +513,11 @@ async def list_accounts(message: types.Message):
 
 
 
+
+
 @dp.message(Command("clear_permissions"))
 async def clear_permissions_cmd(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может использовать эту команду")
         return
 
@@ -627,7 +530,7 @@ async def clear_permissions_cmd(message: types.Message):
 # === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
 @dp.callback_query(lambda c: c.data.startswith("delete:"))
 async def callback_delete_session(callback: types.CallbackQuery):
-    if not is_operator(callback.from_user.id):
+    if callback.from_user.id != ADMIN_ID:
         await callback.answer("⛔ Только админ может удалять сессии")
         return
 
@@ -665,21 +568,13 @@ async def callback_delete_session(callback: types.CallbackQuery):
     if removed_from:
         text += f"\n❎ Доступ удалён у пользователей: {', '.join(removed_from)}"
 
-    if is_operator(callback.from_user.id) and callback.from_user.id != ADMIN_ID:
-        await notify_admin(
-            f"🗑 <b>Оператор удалил сессию</b>\n"
-            f"👤 ID: {callback.from_user.id}\n"
-            f"📂 Аккаунт: {name}"
-        )
-
-
     await callback.message.answer(text, parse_mode="HTML", reply_markup=menu_kb)
     await callback.answer("✅ Удалено")
 
 
 @dp.message(Command("code"))
 async def enter_code(message: types.Message):
-    if not is_operator(message.from_user.id):
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может вводить коды")
         return
 
@@ -709,17 +604,9 @@ async def enter_code(message: types.Message):
                 await message.answer(f"✅ PHASH обработчик подключен для {name}")
             except Exception as e:
                 await message.answer(f"⚠️ Не удалось подключить PHASH для {name}: {e}")
-
-    if is_operator(message.from_user.id) and message.from_user.id != ADMIN_ID:
-        await notify_admin(
-            f"🔐 <b>Оператор ввёл код</b>\n"
-            f"👤 ID: {message.from_user.id}\n"
-            f"📂 Аккаунт: {name}"
-        )
-
 @dp.message(Command("password"))
 async def enter_password(message: types.Message):
-    if not is_operator(message.from_user.id):
+    if not is_admin(message.from_user.id):
         await message.answer("⛔ Только админ может вводить пароль 2FA")
         return
 
@@ -738,36 +625,33 @@ async def enter_password(message: types.Message):
 
     try:
         await client.sign_in(password=password)
+        if await client.is_user_authorized():
+            clients[name] = client
+            pending_auth.pop(name)
+            await client.start()
 
-        if not await client.is_user_authorized():
+            # 🔹 ВАЖНО: подключаем phash
+            bot_entity = await client.get_entity('@leomatchbot')
+            BOT_CHAT_ID = bot_entity.id
+
+            phash_watcher.attach_phash_handler(
+                client,
+                account_name=name,
+                target_chat_ids=[BOT_CHAT_ID],
+                allowed_senders=[BOT_CHAT_ID]
+            )
+
+            await message.answer(
+                f"✅ Аккаунт {name} успешно авторизован с 2FA\n"
+                f"🧠 PHASH обработчик подключён",
+                reply_markup=menu_kb
+            )
+        else:
             await message.answer("❌ Авторизация не удалась")
-            return
-
-        # ✅ сохраняем клиента
-        clients[name] = client
-        pending_auth.pop(name)
-
-        await client.start()
-
-        # ✅ ПОДКЛЮЧАЕМ ОБРАБОТЧИКИ
-        bot_entity = await client.get_entity("@leomatchbot")
-        BOT_CHAT_ID = bot_entity.id
-
-        phash_watcher.attach_phash_handler(
-            client,
-            account_name=name,
-            target_chat_ids=[BOT_CHAT_ID],
-            allowed_senders=[BOT_CHAT_ID],
-        )
-
-        await message.answer(
-            f"✅ Аккаунт {name} успешно авторизован с 2FA\n"
-            f"🧠 PHASH обработчик подключён",
-            reply_markup=menu_kb
-        )
 
     except Exception as e:
         await message.answer(f"⚠️ Ошибка при вводе пароля: {e}")
+
 
 
 # ====== ЗАПУСК ======
@@ -810,6 +694,9 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
+
+
 
 
 
