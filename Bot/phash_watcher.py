@@ -16,6 +16,7 @@ PHOTO_DIR = "photos"
 VIDEO_DIR = "videos"
 PHASH_DISTANCE = 6
 TRIGGER_TEXT = "Кому-то понравилась твоя анкета"
+ATTACHED_ACCOUNTS = set()
 
 os.makedirs(PHOTO_DIR, exist_ok=True)
 os.makedirs(VIDEO_DIR, exist_ok=True)
@@ -81,6 +82,14 @@ def is_phash_enabled(account_name: str) -> bool:
 
 # ================= HANDLER =================
 def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowed_senders=None):
+    # 🔒 защита от повторного подключения
+    if account_name in ATTACHED_ACCOUNTS:
+        print(f"[PHASH] handler already attached for {account_name}")
+        return
+
+    ATTACHED_ACCOUNTS.add(account_name)
+    print(f"[PHASH] handler attached for {account_name}")
+
     if isinstance(target_chat_ids, int):
         target_chat_ids = [target_chat_ids]
     if isinstance(allowed_senders, int):
@@ -131,3 +140,4 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
                     await client.send_message(event.chat_id, "❤️")
             finally:
                 os.remove(file_path)
+
