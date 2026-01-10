@@ -359,11 +359,11 @@ def build_account_keyboard(user_id: int, account_name: str):
                 text=state_text,
                 callback_data=f"toggle_phash:{account_name}"
             )
+        ],
+        [
+        InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{account_name}")
         ]
     ]
-    kb_buttons.append([
-        InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{account_name}")
-    ])
     if user_id == ADMIN_ID:
         kb_buttons.append([
             InlineKeyboardButton(text="📝 Переименовать", callback_data=f"rename:{account_name}"),
@@ -528,11 +528,11 @@ async def list_accounts(message: types.Message):
                     text=state_text,
                     callback_data=f"toggle_phash:{name}"
                 )
+            ],
+            [
+            InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
             ]
         ]
-        kb_buttons.append([
-            InlineKeyboardButton(text="🗑 Удалить сессию", callback_data=f"delete:{name}")
-        ])
         if user_id == ADMIN_ID:
             kb_buttons.append([
                 InlineKeyboardButton(text="📝 Переименовать", callback_data=f"rename:{name}"),
@@ -852,6 +852,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
