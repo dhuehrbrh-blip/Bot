@@ -504,7 +504,7 @@ async def list_accounts(message: types.Message):
             if granted_users:
                 info_text += "👥 Доступ:\n"
                 for uid in granted_users:
-                    info_text += f"• {uid}\n"
+                    info_text += f"• <a href='tg://user?id={uid}'>{uid}</a>\n"
             else:
                 info_text += "🚫 Нет выданных доступов\n"
 
@@ -844,6 +844,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
