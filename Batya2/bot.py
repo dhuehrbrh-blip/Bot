@@ -486,12 +486,6 @@ async def list_accounts(message: types.Message):
         kb_buttons = [
             [
                 InlineKeyboardButton(
-                    text="📩 Получить код",
-                    callback_data=f"getcode:{name}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
                     text=state_text,
                     callback_data=f"toggle_phash:{name}"
                 )
@@ -694,6 +688,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
