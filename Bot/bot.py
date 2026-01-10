@@ -505,8 +505,6 @@ async def list_accounts(message: types.Message):
         handler_count = HANDLER_COUNT.get(name, 0)
         info_text += f"🧠 Обработчиков: <b>{handler_count}</b>\n"
 
-        # ===== владелец (админ) =====
-        info_text += f"👤 Владелец: <a href='tg://user?id={ADMIN_ID}'>{ADMIN_ID}</a>\n"
 
         # ===== инфо о доступах (только для админа) =====
         if user_id == ADMIN_ID:
@@ -514,7 +512,7 @@ async def list_accounts(message: types.Message):
             if granted_users:
                 info_text += "👥 Доступ:\n"
                 for uid in granted_users:
-                    info_text += f"• <a href='tg://user?id={uid}'>{uid}</a>\n"
+                    info_text += f"• <a href=\"https://t.me/user?id={uid}\">{uid}</a>\n"
             else:
                 info_text += "🚫 Нет выданных доступов\n"
 
@@ -855,6 +853,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
