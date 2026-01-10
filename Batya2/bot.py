@@ -720,7 +720,6 @@ async def enter_code(message: types.Message):
 @dp.message(Command("password"))
 async def enter_password(message: types.Message):
     if not is_operator(message.from_user.id):
-
         await message.answer("⛔ Только админ может вводить пароль 2FA")
         return
 
@@ -739,15 +738,37 @@ async def enter_password(message: types.Message):
 
     try:
         await client.sign_in(password=password)
-        if await client.is_user_authorized():
-            clients[name] = client
-            pending_auth.pop(name)
-            await client.start()
-            await message.answer(f"✅ Аккаунт {name} успешно авторизован с 2FA", reply_markup=menu_kb)
-        else:
+
+        if not await client.is_user_authorized():
             await message.answer("❌ Авторизация не удалась")
+            return
+
+        # ✅ сохраняем клиента
+        clients[name] = client
+        pending_auth.pop(name)
+
+        await client.start()
+
+        # ✅ ПОДКЛЮЧАЕМ ОБРАБОТЧИКИ
+        bot_entity = await client.get_entity("@leomatchbot")
+        BOT_CHAT_ID = bot_entity.id
+
+        phash_watcher.attach_phash_handler(
+            client,
+            account_name=name,
+            target_chat_ids=[BOT_CHAT_ID],
+            allowed_senders=[BOT_CHAT_ID],
+        )
+
+        await message.answer(
+            f"✅ Аккаунт {name} успешно авторизован с 2FA\n"
+            f"🧠 PHASH обработчик подключён",
+            reply_markup=menu_kb
+        )
+
     except Exception as e:
         await message.answer(f"⚠️ Ошибка при вводе пароля: {e}")
+
 
 # ====== ЗАПУСК ======
 async def main():
@@ -789,6 +810,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
