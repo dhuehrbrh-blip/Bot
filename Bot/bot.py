@@ -24,6 +24,15 @@ API_ID = 26921799
 API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
 ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
 
+# ====== Конфигурация прокси =====
+PROXY_HOST = "pool.proxy.market"
+PROXY_LOGIN = "7abJSMc5umQJ"
+PROXY_PASSWORD = "PoH5f3Xy"
+PROXY_TYPE = "socks5"
+
+PORT_MIN = 10000
+PORT_MAX = 11000
+PORTS_FILE = "proxy_ports.json"
 
 # ====== Сессия бота ======
 bot = Bot(token=BOT_TOKEN)
@@ -209,15 +218,26 @@ async def export_db(message: types.Message):
 # ====== ФУНКЦИИ СЕССИЙ ======
 async def load_sessions():
     files = [f for f in os.listdir(SESSION_FOLDER) if f.endswith(".session")]
+
     for file in files:
         name = os.path.splitext(file)[0]
         path = os.path.join(SESSION_FOLDER, name)
 
-        # 🔹 Прокси для России
-        proxy = ('socks5', 'pool.proxy.market', 10000, True, '7abJSMc5umQJ', 'PoH5f3Xy')
+        port = get_port_for_account(name)
+
+        proxy = (
+            PROXY_TYPE,
+            PROXY_HOST,
+            port,
+            True,
+            PROXY_LOGIN,
+            PROXY_PASSWORD
+        )
 
         client = TelegramClient(
-            path, API_ID, API_HASH,
+            path,
+            API_ID,
+            API_HASH,
             proxy=proxy,
             device_model=f"Device_{name}",
             system_version=f"Android {random.randint(6, 13)}",
@@ -229,15 +249,25 @@ async def load_sessions():
         if await client.is_user_authorized():
             clients[name] = client
             await client.start()
+            print(f"[PROXY] {name} → порт {port}")
         else:
             await client.disconnect()
+
 
 async def add_account(phone: str, user_id: int):
     name = phone.replace("+", "")
     path = os.path.join(SESSION_FOLDER, name)
 
-    # 🔹 Российский SOCKS5 прокси
-    proxy = ('socks5', 'pool.proxy.market', 10000, True, '7abJSMc5umQJ', 'PoH5f3Xy')
+    port = get_port_for_account(name)
+
+    proxy = (
+        PROXY_TYPE,
+        PROXY_HOST,
+        port,
+        True,
+        PROXY_LOGIN,
+        PROXY_PASSWORD
+    )
 
     client = TelegramClient(
         path,
@@ -255,12 +285,19 @@ async def add_account(phone: str, user_id: int):
     await client.connect()
     try:
         await client.send_code_request(phone)
-        pending_auth[name] = {"client": client, "phone": phone, "user_id": user_id}
-        return f"✅ Код отправлен на {phone}. Введи его командой: /code {name} 12345"
+        pending_auth[name] = {
+            "client": client,
+            "phone": phone,
+            "user_id": user_id
+        }
+        return (
+            f"✅ Код отправлен на {phone}\n"
+            f"🌐 Прокси порт: {port}\n"
+            f"Введи код командой: /code {name} 12345"
+        )
     except Exception as e:
         print(f"[DEBUG] Ошибка при отправке кода на {phone}: {e}")
         return f"⚠️ Ошибка: {e}"
-
 
 async def confirm_code(name: str, code: str):
     if name not in pending_auth:
@@ -295,6 +332,39 @@ async def get_last_code(name: str):
         return f"❌ Код для {name} не найден"
     except Exception as e:
         return f"⚠️ Ошибка при получении кода: {e}"
+
+async def get_account_ip(client: TelegramClient) -> str:
+    try:
+        async with client.session.get("https://api.ipify.org") as r:
+            return await r.text()
+    except Exception:
+        return "unknown"
+
+# ====== Загрузка / сохранение портов ======
+def load_ports():
+    if os.path.exists(PORTS_FILE):
+        with open(PORTS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_ports(data):
+    with open(PORTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+proxy_ports = load_ports()
+
+def get_port_for_account(account_name: str) -> int:
+    if account_name in proxy_ports:
+        return proxy_ports[account_name]
+
+    used_ports = set(proxy_ports.values())
+    for port in range(PORT_MIN, PORT_MAX):
+        if port not in used_ports:
+            proxy_ports[account_name] = port
+            save_ports(proxy_ports)
+            return port
+
+    raise RuntimeError("❌ Нет свободных прокси-портов")
 
 
 # ====== СИСТЕМА ДОСТУПОВ ======
@@ -406,8 +476,10 @@ async def delete_account_cmd(message: types.Message):
             if not permissions[user_id]:  # если у пользователя больше нет доступов — удаляем полностью
                 del permissions[user_id]
             removed_from.append(user_id)
-
-    save_permissions()
+    if name in proxy_ports:
+        proxy_ports.pop(name)
+        save_ports(proxy_ports)
+        save_permissions()
 
 @dp.callback_query(lambda c: c.data.startswith("toggle_phash:"))
 async def toggle_phash(callback: types.CallbackQuery):
@@ -514,7 +586,11 @@ async def list_accounts(message: types.Message):
                     info_text += f"• <a href=\"https://t.me/user?id={uid}\">{uid}</a>\n"
             else:
                 info_text += "🚫 Нет выданных доступов\n"
-
+        if user_id == ADMIN_ID:
+            port = proxy_ports.get(name, "—")
+            ip = await get_account_ip(clients[name])
+            info_text += f"🌐 IP: <code>{ip}</code>\n"
+            info_text += f"🔌 Порт: <code>{port}</code>\n"
         # ===== кнопки =====
         kb_buttons = [
             [
@@ -613,6 +689,10 @@ async def callback_rename(callback: types.CallbackQuery):
                 permissions[uid].remove(old_name)
                 permissions[uid].append(new_name)
         save_permissions()
+        # 🔹 перенос порта прокси
+        if old_name in proxy_ports:
+            proxy_ports[new_name] = proxy_ports.pop(old_name)
+            save_ports(proxy_ports)
 
         await message.answer(
             f"✅ Аккаунт <b>{old_name}</b> переименован в <b>{new_name}</b>",
@@ -700,7 +780,11 @@ async def callback_delete_session(callback: types.CallbackQuery):
             if not permissions[user_id]:
                 del permissions[user_id]
             removed_from.append(user_id)
-    save_permissions()
+    save_permissions()  
+    # 🔹 освобождаем порт
+    if name in proxy_ports:
+        proxy_ports.pop(name)
+        save_ports(proxy_ports)
 
     # Уведомляем
     text = f"🗑 Аккаунт <b>{name}</b> удалён."
@@ -817,7 +901,7 @@ async def main():
     # 1️⃣ Загружаем все сессии
     await load_sessions()
     print("✅ Все сессии загружены")
-
+    
     # 2️⃣ Подключаем phash_watcher для каждого клиента
     for name, client in clients.items():
         # Проверяем авторизацию
@@ -852,6 +936,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
