@@ -129,10 +129,11 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
                 pending = PENDING_RESULT.get(account_name)
                 if pending:
                     await save_hash(pending["hash"], pending["type"])
+                    print(f"[PHASH] {account_name} → SAVED TO DB")
                     PENDING_RESULT[account_name] = None
 
                 ACCOUNT_STATE[account_name] = "ACTIVE"
-                print(f"[PHASH] {account_name} → CONFIRMED, back to ACTIVE")
+                print(f"[PHASH] {account_name} → CONFIRMED → ACTIVE")
             return
 
         # =====================================================
@@ -141,7 +142,7 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
         if TRIGGER_TEXT.lower() not in text.lower():
             return
 
-        # ===== ФОТО =====
+        # ================= ФОТО =================
         if msg.photo:
             file_path = os.path.join(PHOTO_DIR, f"{account_name}_{msg.id}.jpg")
             await client.download_media(msg.photo, file_path)
@@ -150,22 +151,24 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
                 phash = calculate_image_phash(file_path)
                 is_dup = await is_duplicate(phash, "photo")
 
-                await client.send_message(
-                    event.chat_id,
-                    "👎" if is_dup else "❤️"
-                )
-
-                PENDING_RESULT[account_name] = {
-                    "hash": phash,
-                    "type": "photo"
-                }
-                ACCOUNT_STATE[account_name] = "WAIT_CONFIRM"
-                print(f"[PHASH] {account_name} → WAIT_CONFIRM (photo)")
+                if is_dup:
+                    await client.send_message(event.chat_id, "👎")
+                    ACCOUNT_STATE[account_name] = "ACTIVE"
+                    PENDING_RESULT[account_name] = None
+                    print(f"[PHASH] {account_name} → DISLIKE (photo)")
+                else:
+                    await client.send_message(event.chat_id, "❤️")
+                    PENDING_RESULT[account_name] = {
+                        "hash": phash,
+                        "type": "photo"
+                    }
+                    ACCOUNT_STATE[account_name] = "WAIT_CONFIRM"
+                    print(f"[PHASH] {account_name} → LIKE → WAIT_CONFIRM (photo)")
 
             finally:
                 os.remove(file_path)
 
-        # ===== ВИДЕО =====
+        # ================= ВИДЕО =================
         elif msg.video:
             file_path = os.path.join(VIDEO_DIR, f"{account_name}_{msg.id}.mp4")
             await client.download_media(msg.video, file_path)
@@ -174,17 +177,19 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
                 vhash = calculate_video_phash(file_path)
                 is_dup = await is_duplicate(vhash, "video")
 
-                await client.send_message(
-                    event.chat_id,
-                    "👎" if is_dup else "❤️"
-                )
-
-                PENDING_RESULT[account_name] = {
-                    "hash": vhash,
-                    "type": "video"
-                }
-                ACCOUNT_STATE[account_name] = "WAIT_CONFIRM"
-                print(f"[PHASH] {account_name} → WAIT_CONFIRM (video)")
+                if is_dup:
+                    await client.send_message(event.chat_id, "👎")
+                    ACCOUNT_STATE[account_name] = "ACTIVE"
+                    PENDING_RESULT[account_name] = None
+                    print(f"[PHASH] {account_name} → DISLIKE (video)")
+                else:
+                    await client.send_message(event.chat_id, "❤️")
+                    PENDING_RESULT[account_name] = {
+                        "hash": vhash,
+                        "type": "video"
+                    }
+                    ACCOUNT_STATE[account_name] = "WAIT_CONFIRM"
+                    print(f"[PHASH] {account_name} → LIKE → WAIT_CONFIRM (video)")
 
             finally:
                 os.remove(file_path)
