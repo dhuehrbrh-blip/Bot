@@ -761,10 +761,6 @@ async def clear_permissions_cmd(message: types.Message):
 # === УДАЛЕНИЕ СЕССИИ (через кнопку) ===
 @dp.callback_query(lambda c: c.data.startswith("delete:"))
 async def callback_delete_session(callback: types.CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⛔ Только админ может удалять сессии")
-        return
-
     name = callback.data.split(":", 1)[1]
     if name not in clients:
         await callback.message.answer(f"⚠️ Аккаунт {name} не найден")
@@ -948,6 +944,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
