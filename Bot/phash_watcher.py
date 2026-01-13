@@ -120,7 +120,13 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
 
         text = msg.message.strip()
         state = ACCOUNT_STATE.get(account_name, "ACTIVE")
-
+        # 🔁 СБРОС WAIT_CONFIRM, ЕСЛИ ПРИШЛА НОВАЯ АНКЕТА
+        # =====================================================
+        if state == "WAIT_CONFIRM" and TRIGGER_TEXT.lower() in text.lower():
+            print(f"[PHASH] {account_name} → RESET WAIT_CONFIRM (new анкета)")
+            ACCOUNT_STATE[account_name] = "ACTIVE"
+            PENDING_RESULT[account_name] = None
+            state = "ACTIVE"  # 🔴 ОБЯЗАТЕЛЬНО обновляем локальное состояние
         # =====================================================
         # 1️⃣ ОЖИДАНИЕ ПОДТВЕРЖДЕНИЯ
         # =====================================================
@@ -193,3 +199,4 @@ def attach_phash_handler(client, account_name: str, target_chat_ids=None, allowe
 
             finally:
                 os.remove(file_path)
+
