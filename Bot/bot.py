@@ -320,18 +320,30 @@ async def confirm_code(name: str, code: str):
 async def get_last_code(name: str):
     if name not in clients:
         return "⚠️ Аккаунт не найден"
+
     client = clients[name]
+
     try:
+        if not client.is_connected():
+            await client.connect()
+
+        if not await client.is_user_authorized():
+            return "⚠️ Клиент не авторизован"
+
         messages = await client.get_messages(777000, limit=5)
         for msg in messages:
-            match = re.search(r"\d{5}", msg.message)
-            if match:
-                code = match.group(0)
-                last_codes[name] = code
-                return f"{code}"
-        return f"❌ Код для {name} не найден"
+            if msg.message:
+                match = re.search(r"\d{5}", msg.message)
+                if match:
+                    code = match.group(0)
+                    last_codes[name] = code
+                    return code
+
+        return "❌ Код не найден"
+
     except Exception as e:
         return f"⚠️ Ошибка при получении кода: {e}"
+
 
 async def get_account_ip(client: TelegramClient) -> str:
     try:
@@ -936,6 +948,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
