@@ -25,13 +25,13 @@ API_HASH = "bf47ddfc99cf0604a0a4348faaeb97d0"
 ADMIN_ID = 7676178737   # <<<<< ТВОЙ TELEGRAM ID
 
 # ====== Конфигурация прокси =====
-PROXY_HOST = "pool.proxy.market"
-PROXY_LOGIN = "7abJSMc5umQJ"
-PROXY_PASSWORD = "PoH5f3Xy"
+PROXY_HOST = "mobpool.proxy.market"
+PROXY_LOGIN = "kaeqkjCOkaeP"
+PROXY_PASSWORD = "WJKXGgQD"
 PROXY_TYPE = "socks5"
 
 PORT_MIN = 10000
-PORT_MAX = 11000
+PORT_MAX = 10999
 PORTS_FILE = "proxy_ports.json"
 
 # ====== Сессия бота ======
@@ -948,6 +948,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
