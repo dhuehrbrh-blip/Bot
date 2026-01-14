@@ -1,7 +1,0 @@
-aiogram
-telethon
-pillow
-imagehash
-aiohttp
-aiohttp-socks
-
